@@ -1,11 +1,22 @@
 from rest_framework import serializers
 
+from apps.common.mixins_sanitise import SanitisedSubmissionSerializer
+
 from .models import ContactMessage
 
+# `message` is a TextField, so without a ceiling here a single POST can store
+# as much as the request body allows.
+MESSAGE_MAX = 4000
 
-class ContactMessageCreateSerializer(serializers.ModelSerializer):
+
+class ContactMessageCreateSerializer(SanitisedSubmissionSerializer):
     # Bots fill hidden fields; humans leave them empty.
     company_website = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    message = serializers.CharField(max_length=MESSAGE_MAX, trim_whitespace=False)
+
+    LINE_FIELDS = ("full_name", "phone", "subject")
+    TEXT_FIELDS = ("message",)
+    REQUIRED_AFTER_CLEAN = ("full_name", "message")
 
     class Meta:
         model = ContactMessage
@@ -26,13 +37,6 @@ class ContactMessageCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Rejected.")
         return value
 
-    def create(self, validated_data):
-        validated_data.pop("company_website", None)
-        request = self.context.get("request")
-        if request is not None:
-            validated_data["source_ip"] = _client_ip(request)
-        return super().create(validated_data)
-
 
 class ContactMessageAdminSerializer(serializers.ModelSerializer):
     division_label = serializers.CharField(source="get_division_display", read_only=True)
@@ -52,10 +56,3 @@ class ContactMessageAdminSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = [f for f in fields if f != "status"]
-
-
-def _client_ip(request):
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")

@@ -1,13 +1,21 @@
 from rest_framework import serializers
 
-from apps.contact.serializers import _client_ip
+from apps.common.mixins_sanitise import SanitisedSubmissionSerializer
 
 from .models import JobApplication
 
+# `about` is a TextField; same reasoning as the contact message.
+ABOUT_MAX = 2500
 
-class JobApplicationCreateSerializer(serializers.ModelSerializer):
+
+class JobApplicationCreateSerializer(SanitisedSubmissionSerializer):
     # Bots fill hidden fields; people leave them empty.
     company_website = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    about = serializers.CharField(max_length=ABOUT_MAX, trim_whitespace=False)
+
+    LINE_FIELDS = ("full_name", "phone", "location")
+    TEXT_FIELDS = ("about",)
+    REQUIRED_AFTER_CLEAN = ("full_name", "phone", "about")
 
     class Meta:
         model = JobApplication
@@ -29,13 +37,6 @@ class JobApplicationCreateSerializer(serializers.ModelSerializer):
         if value:
             raise serializers.ValidationError("Rejected.")
         return value
-
-    def create(self, validated_data):
-        validated_data.pop("company_website", None)
-        request = self.context.get("request")
-        if request is not None:
-            validated_data["source_ip"] = _client_ip(request)
-        return super().create(validated_data)
 
 
 class JobApplicationAdminSerializer(serializers.ModelSerializer):

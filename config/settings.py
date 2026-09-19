@@ -166,6 +166,15 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+
+# The frontend is served from a different origin to the API in production, so
+# any non-standard request header has to be named here or the browser's
+# preflight rejects it before the request is ever sent.
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
+# Lets the caller see that a response was a replay rather than a fresh login.
+CORS_EXPOSE_HEADERS = ["Idempotent-Replay"]
 CORS_ALLOW_CREDENTIALS = False
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:3000")
 
@@ -186,6 +195,29 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@local
 CONTACT_NOTIFY_EMAIL = env("CONTACT_NOTIFY_EMAIL", "")
 
 # Rebuilding the Cloudflare Pages site after content changes.
+# Only read X-Forwarded-For when a proxy we control is the one setting it.
+# Left off, the header is attacker-supplied and must not be believed.
+TRUST_PROXY_HEADER = env_bool("TRUST_PROXY_HEADER", False)
+
+# Backs the login endpoint's Idempotency-Key replay. Passenger runs several
+# worker processes, so an in-memory cache would only ever see the retry that
+# happened to land on the same worker; the database is the one store they
+# share on shared hosting. Run `manage.py createcachetable` once per deploy
+# target. If the table is missing the login still works, just without replay.
+CACHES = {
+    "default": (
+        {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "fonanyi-local",
+        }
+        if DEBUG
+        else {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "django_cache",
+        }
+    )
+}
+
 CLOUDFLARE_DEPLOY_HOOK = env("CLOUDFLARE_DEPLOY_HOOK", "")
 
 if not DEBUG:
