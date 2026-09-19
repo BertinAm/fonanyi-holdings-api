@@ -59,3 +59,35 @@ def test_a_small_image_is_not_enlarged(tmp_path, settings):
 
     with Image.open(item.image.path) as stored:
         assert stored.size == (300, 200)
+
+
+def test_a_thumbnail_is_generated_on_upload(tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path
+
+    item = GalleryImage.objects.create(title="Big", image=big_jpeg())
+
+    assert item.thumbnail
+    with Image.open(item.thumbnail.path) as thumb:
+        assert max(thumb.size) == 600
+    assert item.thumbnail.size < item.image.size
+
+
+def test_the_api_serves_the_thumbnail_for_grids(tmp_path, settings, client):
+    settings.MEDIA_ROOT = tmp_path
+    GalleryImage.objects.create(title="Big", image=big_jpeg())
+
+    row = client.get("/api/gallery/").json()["results"][0]
+
+    assert row["thumb_url"] and row["thumb_url"] != row["image_url"]
+    assert "-thumb" in row["thumb_url"]
+
+
+def test_resaving_does_not_regenerate_the_thumbnail(tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path
+    item = GalleryImage.objects.create(title="Big", image=big_jpeg())
+    first = item.thumbnail.name
+
+    item.title = "Renamed"
+    item.save()
+
+    assert item.thumbnail.name == first

@@ -1,6 +1,6 @@
 from django.db import models
 
-from apps.common.images import compress
+from apps.common.images import compress, make_thumbnail
 from apps.common.models import TimeStampedModel
 
 
@@ -16,6 +16,7 @@ class GalleryImage(TimeStampedModel):
     caption = models.CharField(max_length=300, blank=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default="events")
     image = models.ImageField(upload_to="gallery/%Y/%m/")
+    thumbnail = models.ImageField(upload_to="gallery/thumbs/%Y/%m/", blank=True, null=True)
     alt_text = models.CharField(max_length=200, blank=True)
     is_published = models.BooleanField(default=True)
     sort_order = models.IntegerField(default=0)
@@ -28,6 +29,15 @@ class GalleryImage(TimeStampedModel):
         return self.title or f"{self.get_category_display()} #{self.pk}"
 
     def save(self, *args, **kwargs):
-        if self.image and not self.image._committed and hasattr(self.image, "file"):
+        fresh_upload = bool(self.image) and not self.image._committed
+        if fresh_upload and hasattr(self.image, "file"):
             self.image = compress(self.image)
-        return super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
+
+        # The thumbnail is derived from the stored file, so it has to happen
+        # after the first save; the second save only writes the one column.
+        if (fresh_upload or not self.thumbnail) and self.image:
+            thumb = make_thumbnail(self.image)
+            if thumb is not None:
+                self.thumbnail.save(thumb.name, thumb, save=False)
+                super().save(update_fields=["thumbnail"])

@@ -6,7 +6,9 @@ off in a static export, so if we do not do this here, nobody does — and the
 people worst affected are visitors on mobile data.
 """
 from io import BytesIO
+from pathlib import Path
 
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image, ImageOps
 
@@ -51,3 +53,31 @@ def compress(image_field, max_edge: int = MAX_EDGE, quality: int = QUALITY):
         size=buffer.getbuffer().nbytes,
         charset=None,
     )
+
+
+THUMB_EDGE = 600
+THUMB_QUALITY = 74
+
+
+def make_thumbnail(image_field, max_edge: int = THUMB_EDGE, quality: int = THUMB_QUALITY):
+    """Return a small JPEG copy of an image, or None if it cannot be made.
+
+    Grids render these at roughly 230-300px. Serving the full 1600px original
+    into that slot costs a visitor on mobile data about ten times what it
+    needs to, which is the whole reason this exists.
+    """
+    if not image_field:
+        return None
+    try:
+        image_field.open()
+        with Image.open(image_field) as opened:
+            picture = ImageOps.exif_transpose(opened).convert("RGB")
+            picture.thumbnail((max_edge, max_edge), Image.LANCZOS)
+            buffer = BytesIO()
+            picture.save(buffer, "JPEG", quality=quality, optimize=True, progressive=True)
+    except Exception:
+        return None
+
+    stem = Path(image_field.name).stem[:80]
+    buffer.seek(0)
+    return ContentFile(buffer.getvalue(), name=f"{stem}-thumb.jpg")
