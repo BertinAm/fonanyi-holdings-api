@@ -31,6 +31,12 @@ echo "==> Installing dependencies"
 echo "==> Applying database migrations"
 "$PY" manage.py migrate --noinput
 
+# Backs the login endpoint's Idempotency-Key replay. Re-running this is
+# harmless: it reports that the table already exists and exits cleanly. Left
+# out, login still works, it just quietly loses the ability to replay a retry.
+echo "==> Ensuring the cache table exists"
+"$PY" manage.py createcachetable
+
 echo "==> Collecting static files"
 "$PY" manage.py collectstatic --noinput
 
