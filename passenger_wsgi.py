@@ -16,18 +16,9 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR))
 
-# Namecheap shared hosting has no MySQL C headers, so mysqlclient cannot be
-# built there. PyMySQL speaks the same protocol and registers itself as the
-# `MySQLdb` module that Django's mysql backend imports.
-try:
-    import MySQLdb  # noqa: F401
-except ImportError:  # pragma: no cover - only on shared hosting
-    try:
-        import pymysql
-
-        pymysql.install_as_MySQLdb()
-    except ImportError:
-        pass
+# The PyMySQL shim lives in config/__init__.py, which Django imports on its
+# way to config.settings -- so it is in place here and for every management
+# command too, not just for requests Passenger serves.
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
