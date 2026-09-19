@@ -66,8 +66,11 @@ class SiteSettings(TimeStampedModel):
 
 
 class Testimonial(TimeStampedModel):
+    # Mirrors the three service pages the site actually has, so a testimonial
+    # can be filed against the work it is about.
     DIVISION_CHOICES = [
-        ("energy", "Energy & Rentals"),
+        ("energy", "Solar & Electrical"),
+        ("rentals", "Rentals & Logistics"),
         ("fashion", "Fashion & Textiles"),
         ("general", "General"),
     ]
