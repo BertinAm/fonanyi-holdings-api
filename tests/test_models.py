@@ -1,3 +1,4 @@
+import os
 import pytest
 from django.utils import timezone
 
@@ -77,3 +78,28 @@ def test_seeding_leaves_existing_testimonials_alone():
     call_command("seed_content")
 
     assert [t.name for t in Testimonial.objects.all()] == ["Real Client"]
+
+
+def test_production_refuses_the_public_development_secret_key():
+    """The fallback key is a literal in a public repo, so it must not boot.
+
+    Django signs session cookies and password-reset tokens with SECRET_KEY.
+    Falling back silently in production would let anyone who can read the
+    repository forge both.
+    """
+    import importlib
+
+    from django.core.exceptions import ImproperlyConfigured
+
+    import config.settings as settings_module
+
+    source = importlib.util.find_spec("config.settings").loader.get_source("config.settings")
+    namespace = {"__name__": "config.settings_probe", "__file__": settings_module.__file__}
+    os.environ["DJANGO_DEBUG"] = "False"
+    os.environ["DJANGO_SECRET_KEY"] = "dev-only-insecure-key-change-me"
+    try:
+        with pytest.raises(ImproperlyConfigured, match="DJANGO_SECRET_KEY"):
+            exec(compile(source, settings_module.__file__, "exec"), namespace)
+    finally:
+        os.environ.pop("DJANGO_DEBUG", None)
+        os.environ.pop("DJANGO_SECRET_KEY", None)

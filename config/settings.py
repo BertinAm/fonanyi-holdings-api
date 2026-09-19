@@ -7,6 +7,8 @@ Runs in two places:
 from pathlib import Path
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,8 +27,20 @@ def env_list(key, default=""):
     return [v.strip() for v in str(env(key, default)).split(",") if v.strip()]
 
 
-SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", False)
+
+# The development fallback is a literal in a public repository, so anyone can
+# read it. Django signs session cookies and password-reset tokens with this
+# key, so booting production without a real one would let a stranger forge
+# both. Refuse to start instead of falling back silently.
+DEV_SECRET_KEY = "dev-only-insecure-key-change-me"
+SECRET_KEY = env("DJANGO_SECRET_KEY", DEV_SECRET_KEY)
+if not DEBUG and SECRET_KEY == DEV_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY is unset. Generate one with:\n"
+        "  python -c \"from django.core.management.utils import get_random_secret_key;"
+        " print(get_random_secret_key())\""
+    )
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
 INSTALLED_APPS = [
