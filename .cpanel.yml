@@ -1,0 +1,29 @@
+---
+# cPanel -> Git Version Control runs these tasks when you click "Deploy HEAD Commit".
+#
+# The repository is cloned to ~/repositories/fonanyi-holdings-api. The Python app
+# itself lives in ~/fonanyi-api, so we copy the tree across -- minus the git
+# metadata and the docs, which the running app has no use for -- then let
+# deploy.sh handle pip, migrate, collectstatic and the Passenger restart.
+#
+# Adjust APPDIR below if you named the application directory differently.
+deployment:
+  tasks:
+    - export REPO=/home/$(whoami)/repositories/fonanyi-holdings-api
+    - export APPDIR=/home/$(whoami)/fonanyi-api
+    - /bin/mkdir -p $APPDIR
+    - >-
+      /bin/rsync -a --delete
+      --exclude '.git'
+      --exclude '.github'
+      --exclude '.cpanel.yml'
+      --exclude 'docs'
+      --exclude '.env'
+      --exclude 'media/'
+      --exclude 'logs/'
+      --exclude 'tmp/'
+      --exclude 'backups/'
+      --exclude 'db.sqlite3'
+      --exclude '.venv/'
+      $REPO/ $APPDIR/
+    - /bin/bash $APPDIR/deploy/deploy.sh

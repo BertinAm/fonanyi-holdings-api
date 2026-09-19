@@ -8,7 +8,7 @@ pytestmark = pytest.mark.django_db
 
 VALID = {
     "full_name": "Ebong Tabi",
-    "phone": "+237677409505",
+    "phone": "+237600000001",
     "role": "canopy",
     "availability": "weekends",
     "years_experience": 3,
