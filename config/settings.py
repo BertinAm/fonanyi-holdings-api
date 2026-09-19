@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.gallery",
     "apps.blog",
     "apps.contact",
+    "apps.careers",
     "apps.analytics",
 ]
 

@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.blog.models import Post
+from apps.careers.models import JobApplication
 from apps.contact.models import ContactMessage
 from apps.gallery.models import GalleryImage
 from apps.siteinfo.models import Testimonial
@@ -82,6 +83,8 @@ class DashboardSummaryView(APIView):
                 "post_count": Post.objects.count(),
                 "published_post_count": Post.objects.filter(is_published=True).count(),
                 "new_message_count": ContactMessage.objects.filter(status="new").count(),
+                "new_application_count": JobApplication.objects.filter(status="new").count(),
+                "total_application_count": JobApplication.objects.count(),
                 "total_message_count": ContactMessage.objects.count(),
                 "views_this_week": views_this_week,
                 "views_prev_week": views_prev_week,

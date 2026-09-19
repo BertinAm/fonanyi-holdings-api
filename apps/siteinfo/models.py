@@ -18,13 +18,18 @@ class SiteSettings(TimeStampedModel):
     phone_secondary = models.CharField(max_length=40, blank=True)
     whatsapp = models.CharField(max_length=40, blank=True)
     email = models.EmailField(blank=True)
-    hours_weekday = models.CharField(max_length=80, default="8am - 6pm")
-    hours_saturday = models.CharField(max_length=80, default="8am - 4pm")
-    hours_sunday = models.CharField(max_length=80, default="Closed")
+    # Opening hours are a single band here rather than a per-day table: the
+    # business is open the same hours on every day it opens.
+    hours_days = models.CharField(max_length=80, default="Tuesday - Sunday")
+    hours_time = models.CharField(max_length=80, default="6am - 10pm")
+    hours_closed = models.CharField(max_length=80, default="Monday", blank=True)
     facebook_url = models.URLField(blank=True)
     instagram_url = models.URLField(blank=True)
     linkedin_url = models.URLField(blank=True)
     # Homepage counters, editable from the dashboard rather than hard-coded.
+    stat_bookings = models.PositiveIntegerField(
+        default=0, help_text="Total bookings taken since launch."
+    )
     stat_events_covered = models.PositiveIntegerField(default=0)
     stat_solar_installs = models.PositiveIntegerField(default=0)
     stat_workers = models.PositiveIntegerField(default=0)
