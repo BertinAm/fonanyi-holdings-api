@@ -16,7 +16,10 @@ class Post(TimeStampedModel):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True, blank=True)
     excerpt = models.TextField(max_length=400, blank=True)
-    body = models.TextField(help_text="Markdown is rendered by the frontend.")
+    body = models.TextField(
+        help_text="Plain text. Leave a blank line between paragraphs; "
+                  "markdown is not rendered.",
+    )
     cover_image = models.ImageField(upload_to="blog/%Y/%m/", blank=True, null=True)
     division = models.CharField(max_length=20, choices=DIVISION_CHOICES, default="company")
     author_name = models.CharField(max_length=120, default="Fonanyi Holdings")
