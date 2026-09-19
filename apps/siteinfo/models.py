@@ -23,12 +23,22 @@ class SiteSettings(TimeStampedModel):
     hours_days = models.CharField(max_length=80, default="Tuesday - Sunday")
     hours_time = models.CharField(max_length=80, default="6am - 10pm")
     hours_closed = models.CharField(max_length=80, default="Monday", blank=True)
+    # The boutique keeps shop hours; the yard keeps event hours. They differ,
+    # so they are stored separately rather than fudged into one line.
+    boutique_hours_days = models.CharField(max_length=80, default="Tuesday - Saturday")
+    boutique_hours_time = models.CharField(max_length=80, default="8am - 7pm WAT")
+    boutique_hours_closed = models.CharField(
+        max_length=80, default="Sunday & Monday", blank=True
+    )
     facebook_url = models.URLField(blank=True)
     instagram_url = models.URLField(blank=True)
     linkedin_url = models.URLField(blank=True)
     # Homepage counters, editable from the dashboard rather than hard-coded.
     stat_bookings = models.PositiveIntegerField(
-        default=0, help_text="Total bookings taken since launch."
+        default=0, help_text="Rental bookings taken since launch: canopies, chairs, tables, service ware, decorations."
+    )
+    stat_fashion_customers = models.PositiveIntegerField(
+        default=0, help_text="Customers the boutique has served since 2010."
     )
     stat_events_covered = models.PositiveIntegerField(default=0)
     stat_solar_installs = models.PositiveIntegerField(default=0)
