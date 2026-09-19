@@ -51,6 +51,17 @@ DEFAULT_BOUTIQUE_DIR = Path(settings.BASE_DIR) / "seed_media" / "boutique"
 POST_COVER = "IMG-20260917-WA0071.jpg"
 WELCOME_POST_COVER_NAME = "two-trades-under-one-roof.jpg"
 
+# Too soft, too dark, or too much glass glare and storage to show at size.
+BOUTIQUE_HOLDBACK = {
+    "beadwork-and-shoes",
+    "dress-rails",
+    "handbag-cases",
+    "jewellery-case",
+    "shopfront-wide",
+    "wigs-corner",
+    "wigs-stands",
+}
+
 BOUTIQUE_TITLES = {
     "shopfront-mannequins": "Shopfront window",
     "shopfront-wide": "The boutique from the street",
@@ -205,6 +216,10 @@ class Command(BaseCommand):
                 category=category,
                 alt_text=BOUTIQUE_ALT.get(path.stem, alt),
                 sort_order=start_order + order,
+                # The first set from the shop varied a lot. The weaker frames
+                # are imported but left unpublished, so the team can see them
+                # in the dashboard and decide, without them going live.
+                is_published=path.stem not in BOUTIQUE_HOLDBACK,
             )
             with path.open("rb") as fh:
                 image.image.save(path.name, File(fh), save=True)
