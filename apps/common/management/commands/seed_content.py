@@ -16,32 +16,33 @@ from apps.siteinfo.models import SiteSettings, Testimonial
 
 TESTIMONIALS = [
     (
-        "Ngozi Ashu",
-        "Ashu Events, Buea",
-        "energy",
-        "Fonanyi set up canopies for our wedding reception and everything was ready hours "
-        "ahead of time. Clean tents, no stress.",
+        "Nchuto Bernard",
+        "",
+        "rentals",
+        "Your service quality and product state is outstanding. I have never "
+        "registered a supply delay for the past four years.",
     ),
     (
-        "Divine Tabe",
-        "Tabe Construction Ltd",
-        "energy",
-        "They installed solar for our site office. Straightforward quote, honest timeline, "
-        "and it has worked without issue since.",
-    ),
-    (
-        "Clarisse Mbah",
-        "Mbah Boutique, Douala",
-        "fashion",
-        "The fashion team delivered our order on time and the quality was better than I "
-        "expected for the price.",
-    ),
-    (
-        "Emmanuel Fru",
-        "Fru Logistics, Limbe",
+        "Ernestine Atemnkeng",
+        "",
         "general",
-        "Reliable truck support for our deliveries. Fair pricing and good communication "
-        "from start to finish.",
+        "My years of working with you have been fulfilling and enjoyable. Your "
+        "company workers are mature and professional in service.",
+    ),
+    (
+        "Boris Neba",
+        "",
+        "rentals",
+        "Your canopies and chairs are always clean, new and of large variety. My "
+        "customers have expressed profound satisfaction when I use your canopies, "
+        "chairs and tables.",
+    ),
+    (
+        "Enanga Irine",
+        "",
+        "rentals",
+        "My job has been greatly appreciated when I make use of your canopies, "
+        "chairs and tables. You are amazing and awesome.",
     ),
 ]
 
@@ -130,8 +131,10 @@ class Command(BaseCommand):
         self._seed_settings()
         self._seed_testimonials()
         self._seed_post(photos_dir)
-        if options["photos"]:
-            self._seed_photos(photos_dir)
+        # Both photo sets ship with the repository, so both import without
+        # anyone having to remember a flag. --photos only overrides where the
+        # event photographs are read from.
+        self._seed_photos(photos_dir)
         # The boutique photographs ship with the repository, so they import
         # whether or not --photos was given. They are what makes the gallery's
         # Fashion filter show anything.
@@ -147,7 +150,18 @@ class Command(BaseCommand):
         settings_row = SiteSettings.load()
         if not settings_row.tagline:
             settings_row.tagline = "Power, events, and style, all in one place."
-            settings_row.stat_events_covered = 24
+            settings_row.phone_primary = "+237 677 409 506"
+            settings_row.phone_secondary = "+237 677 409 505"
+            settings_row.whatsapp = "+237677409505"
+            settings_row.hours_days = "Tuesday - Sunday"
+            settings_row.hours_time = "6am - 10pm WAT"
+            settings_row.hours_closed = "Monday"
+            settings_row.boutique_hours_days = "Tuesday - Saturday"
+            settings_row.boutique_hours_time = "8am - 7pm WAT"
+            settings_row.boutique_hours_closed = "Sunday & Monday"
+            settings_row.stat_bookings = 300
+            settings_row.stat_fashion_customers = 3000
+            settings_row.stat_events_covered = 300
             settings_row.stat_solar_installs = 15
             settings_row.stat_workers = 20
             settings_row.stat_countries_sourced = 4
