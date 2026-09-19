@@ -1,0 +1,5 @@
+# Passenger requires a public/ directory in the application root and refuses
+# to start the app without one. cPanel creates it when the app is set up, but
+# the deploy rsyncs with --delete, so anything not in the repository is
+# removed -- which silently deleted this directory and left the API serving
+# the web server's own 404 instead of Django.

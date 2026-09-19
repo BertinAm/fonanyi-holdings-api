@@ -14,6 +14,10 @@ deployment:
     - /bin/mkdir -p $APPDIR
     - >-
       /bin/rsync -a --delete
+      # Passenger needs public/ in the app root and will not start without
+      # it; cPanel creates it, the repository does not carry it, and --delete
+      # would otherwise remove it on every deploy.
+      --exclude 'public'
       --exclude '.git'
       --exclude '.github'
       --exclude '.cpanel.yml'
