@@ -1,5 +1,6 @@
 from django.db import models
 
+from apps.common.images import compress
 from apps.common.models import TimeStampedModel
 
 
@@ -25,3 +26,8 @@ class GalleryImage(TimeStampedModel):
 
     def __str__(self):
         return self.title or f"{self.get_category_display()} #{self.pk}"
+
+    def save(self, *args, **kwargs):
+        if self.image and not self.image._committed and hasattr(self.image, "file"):
+            self.image = compress(self.image)
+        return super().save(*args, **kwargs)

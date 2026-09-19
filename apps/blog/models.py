@@ -2,6 +2,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 
+from apps.common.images import compress
 from apps.common.models import TimeStampedModel
 
 
@@ -36,6 +37,8 @@ class Post(TimeStampedModel):
         return self.title
 
     def save(self, *args, **kwargs):
+        if self.cover_image and not self.cover_image._committed and hasattr(self.cover_image, "file"):
+            self.cover_image = compress(self.cover_image)
         if not self.slug:
             base = slugify(self.title)[:200] or "post"
             slug, n = base, 2

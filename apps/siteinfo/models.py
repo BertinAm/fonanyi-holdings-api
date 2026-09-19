@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from apps.common.images import compress
 from apps.common.models import TimeStampedModel
 
 
@@ -72,6 +73,11 @@ class Testimonial(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} ({self.get_division_display()})"
+
+    def save(self, *args, **kwargs):
+        if self.avatar and not self.avatar._committed and hasattr(self.avatar, "file"):
+            self.avatar = compress(self.avatar, max_edge=400)
+        return super().save(*args, **kwargs)
 
 
 class ContentFlag(TimeStampedModel):
