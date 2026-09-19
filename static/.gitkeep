@@ -1,0 +1,7 @@
+# Keeps this directory in the repository.
+#
+# settings.py lists it in STATICFILES_DIRS for any hand-written CSS or JS the
+# API ever needs (the dashboard is a separate app, so today there is none).
+# Git does not track empty directories, so without this file the directory
+# vanishes on clone and every deploy logs staticfiles.W004 -- a warning that
+# looks like a fault but is not one.
