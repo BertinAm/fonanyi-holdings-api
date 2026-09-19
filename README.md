@@ -41,7 +41,7 @@ python3 -m venv .venv
 ./.venv/bin/pip install -r requirements-dev.txt
 cp .env.example .env          # set DB_ENGINE=sqlite for local work
 ./.venv/bin/python manage.py migrate
-./.venv/bin/python manage.py createsuperuser
+./.venv/bin/python manage.py createsuperuser        # or: manage.py createadmin
 ./.venv/bin/python manage.py seed_content        # optional demo content
 ./.venv/bin/python manage.py runserver
 ```
@@ -119,6 +119,10 @@ once a rebuild runs. `rebuild_if_dirty` is what connects the two.
 Uploaded media and the database live outside this repository.
 
 ## Deployment
+
+On a plan with no Terminal or SSH, `createsuperuser` cannot run because it
+prompts for a password. `manage.py createadmin` generates one and prints it
+instead, so it works through cPanel's "Execute python script" box.
 
 `deployment-namecheap.md` in the deployment docs covers the full sequence.
 In outline: push, pull on the host through the control panel's
