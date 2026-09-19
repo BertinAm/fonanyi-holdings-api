@@ -5,6 +5,7 @@ install so the site has real photos and copy before the client takes over.
 """
 from pathlib import Path
 
+from django.conf import settings
 from django.core.files import File
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -44,6 +45,11 @@ TESTIMONIALS = [
     ),
 ]
 
+# settings.py lives at backend/config/, so BASE_DIR is backend/.
+DEFAULT_PHOTOS_DIR = Path(settings.BASE_DIR) / "seed_media" / "photos"
+POST_COVER = "IMG-20260917-WA0071.jpg"
+WELCOME_POST_COVER_NAME = "two-trades-under-one-roof.jpg"
+
 WELCOME_POST = {
     "title": "Fonanyi Holdings brings two trades under one roof",
     "division": "company",
@@ -78,11 +84,14 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        photos_dir = (
+            Path(options["photos"]).expanduser() if options["photos"] else DEFAULT_PHOTOS_DIR
+        )
         self._seed_settings()
         self._seed_testimonials()
-        self._seed_post()
+        self._seed_post(photos_dir)
         if options["photos"]:
-            self._seed_photos(Path(options["photos"]).expanduser())
+            self._seed_photos(photos_dir)
         self.stdout.write(self.style.SUCCESS("Seed complete."))
 
     def _seed_settings(self):
@@ -97,6 +106,14 @@ class Command(BaseCommand):
             self.stdout.write("Site settings initialised.")
 
     def _seed_testimonials(self):
+        # get_or_create keys on name, so these are only absent once the team
+        # has replaced them with real quotes -- at which point re-running the
+        # seed would put every placeholder back on the live homepage. Seed
+        # only into an empty table.
+        if Testimonial.objects.exists():
+            self.stdout.write("Testimonials: already present, left alone.")
+            return
+
         created = 0
         for order, (name, role, division, quote) in enumerate(TESTIMONIALS):
             _, made = Testimonial.objects.get_or_create(
@@ -111,12 +128,22 @@ class Command(BaseCommand):
             created += int(made)
         self.stdout.write(f"Testimonials: {created} added.")
 
-    def _seed_post(self):
+    def _seed_post(self, photos_dir):
         if Post.objects.filter(title=WELCOME_POST["title"]).exists():
             return
-        Post.objects.create(
-            **WELCOME_POST, is_published=True, published_at=timezone.now()
-        )
+        post = Post(**WELCOME_POST, is_published=True, published_at=timezone.now())
+
+        # A card with no cover falls back to a plain gradient, so give the
+        # first article one of the company's own photographs. It doubles as
+        # the OG image when the article is shared.
+        cover = photos_dir / POST_COVER
+        if cover.is_file():
+            with cover.open("rb") as fh:
+                post.cover_image.save(f"{WELCOME_POST_COVER_NAME}", File(fh), save=False)
+        else:
+            self.stderr.write(f"{cover} not found; article published without a cover.")
+
+        post.save()
         self.stdout.write("First article published.")
 
     def _seed_photos(self, directory):

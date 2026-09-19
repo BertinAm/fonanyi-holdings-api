@@ -60,3 +60,20 @@ def test_visitor_hash_does_not_contain_the_address():
 
     assert "196.1.2.3" not in digest
     assert len(digest) == 64
+
+
+def test_seeding_leaves_existing_testimonials_alone():
+    """Re-running the seed must not put placeholders back on a live site.
+
+    get_or_create keys on the name, so once the team has swapped the seeded
+    quotes for real ones the placeholders look absent and would be recreated.
+    """
+    from django.core.management import call_command
+
+    from apps.siteinfo.models import Testimonial
+
+    Testimonial.objects.create(name="Real Client", quote="A real quote.", division="rentals")
+
+    call_command("seed_content")
+
+    assert [t.name for t in Testimonial.objects.all()] == ["Real Client"]
