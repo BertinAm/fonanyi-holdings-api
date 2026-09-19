@@ -47,8 +47,37 @@ TESTIMONIALS = [
 
 # settings.py lives at backend/config/, so BASE_DIR is backend/.
 DEFAULT_PHOTOS_DIR = Path(settings.BASE_DIR) / "seed_media" / "photos"
+DEFAULT_BOUTIQUE_DIR = Path(settings.BASE_DIR) / "seed_media" / "boutique"
 POST_COVER = "IMG-20260917-WA0071.jpg"
 WELCOME_POST_COVER_NAME = "two-trades-under-one-roof.jpg"
+
+BOUTIQUE_TITLES = {
+    "shopfront-mannequins": "Shopfront window",
+    "shopfront-wide": "The boutique from the street",
+    "interior-wigs-textiles": "Wigs and textiles",
+    "interior-rails-jewellery": "Rails and jewellery case",
+    "jewellery-case": "Jewellery and clutches",
+    "handbag-cases": "Handbags",
+    "dress-rails": "Dress rails",
+    "beadwork-and-shoes": "Beadwork and footwear",
+    "wigs-display": "Wigs on display",
+    "wigs-corner": "Wig corner",
+    "wigs-stands": "Wigs on stands",
+}
+
+BOUTIQUE_ALT = {
+    "shopfront-mannequins": "The boutique window, with mannequins in embroidered African wear and a men's senator suit",
+    "shopfront-wide": "The full shopfront, its window displaying beaded gowns and a sequinned top",
+    "interior-wigs-textiles": "Inside the boutique: wigs, bagged textiles and rails of printed dresses",
+    "interior-rails-jewellery": "Rails of covered garments beside a glass case of jewellery",
+    "jewellery-case": "A display case of necklaces, earrings and beaded evening clutches",
+    "handbag-cases": "Glass cabinets of handbags in assorted leathers and colours",
+    "dress-rails": "Long rails of dresses hanging in protective covers",
+    "beadwork-and-shoes": "Traditional beaded necklaces on display next to a shelf of women's shoes",
+    "wigs-display": "Wigs styled on stands, from short crops to long waves",
+    "wigs-corner": "A corner shelf of wigs in several lengths and colours",
+    "wigs-stands": "Wigs on tripod stands in the middle of the shop floor",
+}
 
 WELCOME_POST = {
     "title": "Fonanyi Holdings brings two trades under one roof",
@@ -92,6 +121,15 @@ class Command(BaseCommand):
         self._seed_post(photos_dir)
         if options["photos"]:
             self._seed_photos(photos_dir)
+        # The boutique photographs ship with the repository, so they import
+        # whether or not --photos was given. They are what makes the gallery's
+        # Fashion filter show anything.
+        self._seed_photos(
+            DEFAULT_BOUTIQUE_DIR,
+            category="fashion",
+            alt="The Fonanyi boutique in Buea",
+            start_order=100,
+        )
         self.stdout.write(self.style.SUCCESS("Seed complete."))
 
     def _seed_settings(self):
@@ -146,7 +184,8 @@ class Command(BaseCommand):
         post.save()
         self.stdout.write("First article published.")
 
-    def _seed_photos(self, directory):
+    def _seed_photos(self, directory, category="events", alt="Fonanyi event setup in Buea",
+                     start_order=0):
         if not directory.is_dir():
             self.stderr.write(f"{directory} is not a directory; skipping photos.")
             return
@@ -155,13 +194,17 @@ class Command(BaseCommand):
         )
         created = 0
         for order, path in enumerate(files):
-            if GalleryImage.objects.filter(title=path.stem).exists():
+            # Dedupe on the title actually stored, not on the file stem.
+            # Those differ for the boutique set, and keying on the stem would
+            # make every re-run import the whole folder again.
+            title = BOUTIQUE_TITLES.get(path.stem, path.stem)
+            if GalleryImage.objects.filter(title=title).exists():
                 continue
             image = GalleryImage(
-                title=path.stem,
-                category="events",
-                alt_text="Fonanyi event setup in Buea",
-                sort_order=order,
+                title=title,
+                category=category,
+                alt_text=BOUTIQUE_ALT.get(path.stem, alt),
+                sort_order=start_order + order,
             )
             with path.open("rb") as fh:
                 image.image.save(path.name, File(fh), save=True)

@@ -103,3 +103,22 @@ def test_production_refuses_the_public_development_secret_key():
     finally:
         os.environ.pop("DJANGO_DEBUG", None)
         os.environ.pop("DJANGO_SECRET_KEY", None)
+
+
+def test_seeding_the_boutique_photos_twice_does_not_duplicate_them():
+    """The stored title differs from the file stem, so dedupe must use the title.
+
+    Keying the existence check on the file stem would make every re-run import
+    the whole folder again.
+    """
+    from django.core.management import call_command
+
+    from apps.gallery.models import GalleryImage
+
+    call_command("seed_content")
+    first = GalleryImage.objects.filter(category="fashion").count()
+
+    call_command("seed_content")
+
+    assert GalleryImage.objects.filter(category="fashion").count() == first
+    assert first > 0
