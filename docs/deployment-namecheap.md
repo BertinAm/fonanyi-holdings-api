@@ -34,7 +34,7 @@ cPanel → **Setup Python App** → **Create Application**
 | --- | --- |
 | Python version | 3.11 or 3.12 (highest available) |
 | Application root | `fonanyi-api` |
-| Application URL | `api.fonanyiholdings.com` (a subdomain, not a subfolder) |
+| Application URL | `api.fonanyiholdingsltd.com` (a subdomain, not a subfolder) |
 | Application startup file | `passenger_wsgi.py` |
 | Application Entry point | `application` |
 
@@ -80,16 +80,16 @@ Fill in at least:
 ```
 DJANGO_SECRET_KEY=<50+ random characters>
 DJANGO_DEBUG=False
-DJANGO_ALLOWED_HOSTS=api.fonanyiholdings.com
+DJANGO_ALLOWED_HOSTS=api.fonanyiholdingsltd.com
 DB_ENGINE=mysql
 DB_NAME=cpuser_fonanyi
 DB_USER=cpuser_fonanyi
 DB_PASSWORD=<the password from step 1>
 DB_HOST=localhost
-SITE_URL=https://api.fonanyiholdings.com
-FRONTEND_URL=https://fonanyiholdings.com
-CORS_ALLOWED_ORIGINS=https://fonanyiholdings.com,https://www.fonanyiholdings.com
-CSRF_TRUSTED_ORIGINS=https://fonanyiholdings.com,https://www.fonanyiholdings.com
+SITE_URL=https://api.fonanyiholdingsltd.com
+FRONTEND_URL=https://fonanyiholdingsltd.com
+CORS_ALLOWED_ORIGINS=https://fonanyiholdingsltd.com,https://www.fonanyiholdingsltd.com
+CSRF_TRUSTED_ORIGINS=https://fonanyiholdingsltd.com,https://www.fonanyiholdingsltd.com
 DJANGO_MEDIA_ROOT=/home/<cpuser>/fonanyi-api/media
 CLOUDFLARE_DEPLOY_HOOK=<from the Cloudflare docs, step 5 there>
 ```
@@ -146,7 +146,7 @@ Every change follows the same three steps:
 # 1. In cPanel → Git Version Control → Manage → "Update from Remote"
 # 2. Click "Deploy HEAD Commit"   (this runs .cpanel.yml → deploy/deploy.sh)
 # 3. Confirm it came back up:
-curl -si https://api.fonanyiholdings.com/api/site-settings/ | head -1
+curl -si https://api.fonanyiholdingsltd.com/api/site-settings/ | head -1
 ```
 
 `deploy/deploy.sh` installs dependencies, migrates, collects static files and

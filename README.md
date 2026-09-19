@@ -1,6 +1,6 @@
 # Fonanyi Holdings — API
 
-Django REST API behind the [Fonanyi Holdings Ltd](https://fonanyiholdings.com)
+Django REST API behind the [Fonanyi Holdings Ltd](https://fonanyiholdingsltd.com)
 website: site settings, gallery, articles, testimonials, enquiries and job
 applications, plus the data layer for the staff dashboard.
 

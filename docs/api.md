@@ -1,6 +1,6 @@
 # API reference
 
-Base URL: `https://api.fonanyiholdings.com/api`
+Base URL: `https://api.fonanyiholdingsltd.com/api`
 
 Authentication is JWT (`Authorization: Bearer <access>`). Public reads need no
 token. Anything that changes data needs a **staff** account.
