@@ -9,7 +9,9 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$APP_DIR"
 
-# cPanel creates the virtualenv under ~/virtualenv/<app-dir>/<python-version>.
+# cPanel creates the virtualenv under ~/virtualenv/<app-dir>/<python-version>,
+# where <app-dir> is the Application root -- now the domain directory, since
+# the checkout, the app root and the document root are all the same place.
 # VENV_DIR can be exported to override the guess.
 if [[ -z "${VENV_DIR:-}" ]]; then
   VENV_DIR="$(ls -d "$HOME"/virtualenv/"$(basename "$APP_DIR")"/*/ 2>/dev/null | head -1 || true)"

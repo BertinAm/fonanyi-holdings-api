@@ -1,41 +1,20 @@
 ---
-# cPanel -> Git Version Control runs these tasks when you click "Deploy HEAD Commit".
+# cPanel -> Git Version Control runs these when you click "Deploy HEAD Commit".
 #
-# The repository is cloned to ~/repositories/fonanyi-holdings-api. The Python app
-# itself lives in ~/fonanyi-api, so we copy the tree across -- minus the git
-# metadata and the docs, which the running app has no use for -- then let
-# deploy.sh handle pip, migrate, collectstatic and the Passenger restart.
+# The repository is cloned directly into the application directory, which is
+# also the subdomain's document root:
 #
-# Adjust APPDIR below if you named the application directory differently.
+#     ~/api.fonanyiholdingsltd.com   <- git checkout, Passenger app root,
+#                                       and the domain's document root
+#
+# One directory, not two. The previous arrangement kept the checkout in
+# ~/repositories/ and rsynced it across to a separate app directory, and every
+# problem we had came out of that copy: --delete removed the public/ directory
+# Passenger requires, -a stamped the source's 0700 onto the app root, and the
+# two could drift apart without anything reporting it.
+#
+# Nothing is rsynced now. The checkout is the app.
 deployment:
   tasks:
-    - export REPO=/home/$(whoami)/repositories/fonanyi-holdings-api
-    - export APPDIR=/home/$(whoami)/fonanyi-api
-    - /bin/mkdir -p $APPDIR
-    - >-
-      /bin/rsync -a --delete
-      # Passenger needs public/ in the app root and will not start without
-      # it; cPanel creates it, the repository does not carry it, and --delete
-      # would otherwise remove it on every deploy.
-      --exclude 'public'
-      --exclude '.git'
-      --exclude '.github'
-      --exclude '.cpanel.yml'
-      --exclude 'docs'
-      --exclude '.env'
-      --exclude 'media/'
-      --exclude 'logs/'
-      --exclude 'tmp/'
-      --exclude 'backups/'
-      --exclude 'db.sqlite3'
-      --exclude '.venv/'
-      $REPO/ $APPDIR/
-    # rsync -a preserves permissions from the source, and with a trailing
-    # slash it stamps the source directory's own mode onto the destination.
-    # cPanel creates ~/repositories/* restrictively, so every deploy was
-    # setting the app root to 0700. Passenger will not start an app whose
-    # root it cannot traverse, and it declines silently -- no error page, no
-    # stderr.log, the request just falls through to the web server. The app
-    # kept serving until the next restart, then never came back.
-    - /bin/chmod 0755 $APPDIR
+    - export APPDIR=/home/$(whoami)/api.fonanyiholdingsltd.com
     - /bin/bash $APPDIR/deploy/deploy.sh
