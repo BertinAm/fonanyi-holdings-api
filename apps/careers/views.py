@@ -1,8 +1,12 @@
+import logging
+
 from django.conf import settings
 from django.core.mail import send_mail
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 
 from .models import JobApplication
 from .serializers import JobApplicationAdminSerializer, JobApplicationCreateSerializer
@@ -58,7 +62,12 @@ def _notify_staff(application):
             ),
             from_email=None,
             recipient_list=[recipient],
-            fail_silently=True,
+            fail_silently=False,
         )
     except Exception:  # pragma: no cover - shared hosting SMTP is flaky
-        pass
+        # The application is already saved. Losing the alert is survivable;
+        # losing it *silently* is not, because nobody would ever find out
+        # that the notifications had stopped.
+        logger.warning(
+            "Could not e-mail the application alert for %s", application.full_name, exc_info=True
+        )

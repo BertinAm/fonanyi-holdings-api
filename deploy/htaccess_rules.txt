@@ -1,0 +1,24 @@
+# BEGIN fonanyi source protection v2
+# Only /static/ and /media/ are meant to be fetched off the disk. Everything
+# else in this directory is application source and belongs to Passenger.
+<FilesMatch "\.(py|pyc|pyo|yml|yaml|sh|md|cfg|ini|toml|log|sqlite3|example|lock)$">
+  Require all denied
+</FilesMatch>
+
+# Dotfiles, but only by their own name. Apache matches the last path segment,
+# so this does not touch anything inside /.well-known/.
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+# .txt is not denied wholesale, so that adding a robots.txt later reaches
+# Django instead of silently returning 403. These two are named instead:
+# the requirements lists pin exact versions, and staticfiles.json maps every
+# original filename to its hashed name. Neither is a secret, both are free
+# reconnaissance.
+<FilesMatch "^(requirements.*\.txt|staticfiles\.json)$">
+  Require all denied
+</FilesMatch>
+
+RedirectMatch 404 ^/(config|apps|deploy|tests|docs|seed_media|tmp|\.git)(/|$)
+# END fonanyi source protection

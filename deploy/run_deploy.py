@@ -18,7 +18,7 @@ when only the application code has changed.
 
 from __future__ import annotations
 
-import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -31,24 +31,10 @@ PYTHON = sys.executable
 # only as a 500, so the real file goes back before anything else runs.
 STUB_MARKER = "load_source"
 
-HTACCESS_MARKER = "# BEGIN fonanyi source protection"
-HTACCESS_RULES = """
-# BEGIN fonanyi source protection
-# Only /static/ and /media/ are meant to be fetched off the disk. Everything
-# else in this directory is application source and belongs to Passenger.
-<FilesMatch "\\.(py|pyc|pyo|yml|yaml|sh|md|cfg|ini|toml|log|sqlite3|example|lock)$">
-  Require all denied
-</FilesMatch>
-
-# Dotfiles, but only by their own name. Apache matches the last path segment,
-# so this does not touch anything inside /.well-known/.
-<FilesMatch "^\\.">
-  Require all denied
-</FilesMatch>
-
-RedirectMatch 404 ^/(config|apps|deploy|tests|docs|seed_media|tmp|\\.git)(/|$)
-# END fonanyi source protection
-"""
+HTACCESS_BEGIN = "# BEGIN fonanyi source protection"
+HTACCESS_END = "# END fonanyi source protection"
+# Kept in one file so this and deploy/harden_htaccess.sh cannot drift apart.
+HTACCESS_RULES_FILE = APP_DIR / "deploy" / "htaccess_rules.txt"
 
 failures: list[str] = []
 
@@ -96,16 +82,28 @@ def fix_app_root_mode() -> None:
 
 def harden_htaccess() -> None:
     print("\n==> Source protection in .htaccess", flush=True)
+    if not HTACCESS_RULES_FILE.is_file():
+        print(f"    {HTACCESS_RULES_FILE} is missing; left alone", flush=True)
+        failures.append("htaccess rules file missing")
+        return
+
     path = APP_DIR / ".htaccess"
     existing = path.read_text() if path.is_file() else ""
-    if HTACCESS_MARKER in existing:
-        print("    already there", flush=True)
-        return
-    # Appended, never replaced: cPanel owns the Passenger directives at the
-    # top of this file and rewrites them whenever the Python app is edited.
-    with path.open("a") as handle:
-        handle.write(HTACCESS_RULES)
-    print("    rules appended", flush=True)
+
+    # An existing block is replaced rather than skipped, so a change to the
+    # rules actually reaches a host that was hardened by an earlier version.
+    if HTACCESS_BEGIN in existing:
+        pattern = re.compile(
+            rf"^{re.escape(HTACCESS_BEGIN)}.*?^{re.escape(HTACCESS_END)}\n?",
+            re.DOTALL | re.MULTILINE,
+        )
+        existing = pattern.sub("", existing)
+        print("    replaced the previous block", flush=True)
+
+    # Appended, never replacing the whole file: cPanel owns the Passenger
+    # directives at the top and rewrites them whenever the app is edited.
+    path.write_text(existing.rstrip("\n") + "\n\n" + HTACCESS_RULES_FILE.read_text())
+    print("    rules written", flush=True)
 
 
 def restart() -> None:

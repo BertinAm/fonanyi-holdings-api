@@ -7,34 +7,30 @@
 # cPanel owns the top of .htaccess (the Passenger directives) and rewrites it
 # whenever the Python app is edited, so this appends a marked block rather than
 # replacing the file, and re-appends it if cPanel has dropped it.
+#
+# The rules themselves live in deploy/htaccess_rules.txt, so this script and
+# deploy/run_deploy.py cannot drift apart.
 set -euo pipefail
 
 APP_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 FILE="$APP_DIR/.htaccess"
-MARKER="# BEGIN fonanyi source protection"
+RULES="$APP_DIR/deploy/htaccess_rules.txt"
+BEGIN="# BEGIN fonanyi source protection"
+END="# END fonanyi source protection"
 
-if [[ -f "$FILE" ]] && grep -qF "$MARKER" "$FILE"; then
-  echo "==> .htaccess already hardened"
-  exit 0
+if [[ ! -f "$RULES" ]]; then
+  echo "==> $RULES is missing; leaving .htaccess alone" >&2
+  exit 1
 fi
 
-cat >> "$FILE" <<'RULES'
+# An existing block is removed rather than skipped, so a change to the rules
+# actually reaches a host that was hardened by an earlier version.
+if [[ -f "$FILE" ]] && grep -qF "$BEGIN" "$FILE"; then
+  sed -i.bak "/^${BEGIN}/,/^${END}/d" "$FILE"
+  rm -f "$FILE.bak"
+  echo "==> Removed the previous source-protection block"
+fi
 
-# BEGIN fonanyi source protection
-# Only /static/ and /media/ are meant to be fetched off the disk. Everything
-# else in this directory is application source and belongs to Passenger.
-<FilesMatch "\.(py|pyc|pyo|yml|yaml|sh|md|cfg|ini|toml|log|sqlite3|example|lock)$">
-  Require all denied
-</FilesMatch>
-
-# Dotfiles, but only by their own name. Apache matches the last path segment,
-# so this does not touch anything inside /.well-known/.
-<FilesMatch "^\.">
-  Require all denied
-</FilesMatch>
-
-RedirectMatch 404 ^/(config|apps|deploy|tests|docs|seed_media|tmp|\.git)(/|$)
-# END fonanyi source protection
-RULES
-
-echo "==> Appended source-protection rules to .htaccess"
+printf '\n' >> "$FILE"
+cat "$RULES" >> "$FILE"
+echo "==> Source-protection rules written to .htaccess"
