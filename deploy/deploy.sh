@@ -58,6 +58,16 @@ echo "==> Ensuring the cache table exists"
 echo "==> Collecting static files"
 "$PY" manage.py collectstatic --noinput
 
+# The uploaded files live outside the database, so a rebuilt account has rows
+# pointing at bytes that are no longer there. This copies them back out of
+# seed_media/ and skips anything already present, so it is a no-op once the
+# media directory is whole.
+echo "==> Restoring any missing media files"
+"$PY" manage.py restore_media
+
+# LiteSpeed serves this directory, so the source has to be denied explicitly.
+bash "$APP_DIR/deploy/harden_htaccess.sh" "$APP_DIR"
+
 echo "==> Checking deployment settings"
 "$PY" manage.py check --deploy || true
 

@@ -11,3 +11,5 @@ logs/
 tmp/
 .pytest_cache/
 .DS_Store
+static/*
+!static/.gitkeep

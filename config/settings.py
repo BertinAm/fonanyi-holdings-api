@@ -131,8 +131,13 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = env("DJANGO_STATIC_URL", "/static/")
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+# On the shared host the document root and the application root are the same
+# directory, so LiteSpeed serves any file that exists on disk and only hands
+# the miss to Passenger. Collecting into BASE_DIR/static therefore puts the
+# admin CSS where the web server already looks, and Django never sees the
+# request. Whitenoise stays in the middleware as the fallback for anything
+# the web server does not pick up, and for local runserver.
+STATIC_ROOT = Path(env("DJANGO_STATIC_ROOT", BASE_DIR / "static"))
 MEDIA_URL = env("DJANGO_MEDIA_URL", "/media/")
 MEDIA_ROOT = Path(env("DJANGO_MEDIA_ROOT", BASE_DIR / "media"))
 
