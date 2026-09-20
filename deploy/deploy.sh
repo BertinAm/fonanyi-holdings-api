@@ -24,6 +24,13 @@ PY="$VENV_DIR/bin/python"
 PIP="$VENV_DIR/bin/pip"
 
 echo "==> Using $PY"
+# Belt and braces: the deploy task sets this too, but deploy.sh is also run
+# by hand, and a 0700 app root stops Passenger starting without saying so.
+if [[ "$(stat -c '%a' "$APP_DIR" 2>/dev/null || echo '')" == "700" ]]; then
+  echo "==> App root was 0700; Passenger cannot traverse it. Fixing to 0755."
+  chmod 0755 "$APP_DIR"
+fi
+
 echo "==> Installing dependencies"
 "$PIP" install --quiet --upgrade pip
 "$PIP" install --quiet -r requirements-shared-hosting.txt

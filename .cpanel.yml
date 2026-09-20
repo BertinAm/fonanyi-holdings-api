@@ -30,4 +30,12 @@ deployment:
       --exclude 'db.sqlite3'
       --exclude '.venv/'
       $REPO/ $APPDIR/
+    # rsync -a preserves permissions from the source, and with a trailing
+    # slash it stamps the source directory's own mode onto the destination.
+    # cPanel creates ~/repositories/* restrictively, so every deploy was
+    # setting the app root to 0700. Passenger will not start an app whose
+    # root it cannot traverse, and it declines silently -- no error page, no
+    # stderr.log, the request just falls through to the web server. The app
+    # kept serving until the next restart, then never came back.
+    - /bin/chmod 0755 $APPDIR
     - /bin/bash $APPDIR/deploy/deploy.sh
