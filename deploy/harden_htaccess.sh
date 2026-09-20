@@ -23,10 +23,12 @@ cat >> "$FILE" <<'RULES'
 # BEGIN fonanyi source protection
 # Only /static/ and /media/ are meant to be fetched off the disk. Everything
 # else in this directory is application source and belongs to Passenger.
-<FilesMatch "\.(py|pyc|pyo|yml|yaml|sh|md|cfg|ini|toml|txt|log|sqlite3|example|lock)$">
+<FilesMatch "\.(py|pyc|pyo|yml|yaml|sh|md|cfg|ini|toml|log|sqlite3|example|lock)$">
   Require all denied
 </FilesMatch>
 
+# Dotfiles, but only by their own name. Apache matches the last path segment,
+# so this does not touch anything inside /.well-known/.
 <FilesMatch "^\.">
   Require all denied
 </FilesMatch>
