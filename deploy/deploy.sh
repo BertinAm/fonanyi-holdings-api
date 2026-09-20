@@ -33,6 +33,15 @@ if [[ "$(stat -c '%a' "$APP_DIR" 2>/dev/null || echo '')" == "700" ]]; then
   chmod 0755 "$APP_DIR"
 fi
 
+# cPanel writes its own passenger_wsgi.py whenever the app is created, and
+# with the checkout and the app root being one directory that overwrites ours.
+# Its stub loads itself and dies on RecursionError, which Passenger reports
+# only as a 500. Put the tracked file back before doing anything else.
+if grep -q "load_source" "$APP_DIR/passenger_wsgi.py" 2>/dev/null; then
+  echo "==> passenger_wsgi.py was replaced by cPanel's stub; restoring from git"
+  git -C "$APP_DIR" checkout -- passenger_wsgi.py || true
+fi
+
 echo "==> Installing dependencies"
 "$PIP" install --quiet --upgrade pip
 "$PIP" install --quiet -r requirements-shared-hosting.txt
