@@ -73,6 +73,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Last, so it tags error responses and admin pages alike.
+    "apps.common.middleware.NoIndexMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

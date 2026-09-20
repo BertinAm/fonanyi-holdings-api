@@ -17,3 +17,12 @@ os.environ.setdefault("DJANGO_DEBUG", "True")
 os.environ.setdefault("DB_ENGINE", "sqlite")
 
 from .settings import *  # noqa: F401,F403,E402
+
+# The manifest storage refuses to build a URL for a file collectstatic has not
+# processed, so any test that renders the admin would need a collectstatic run
+# first. The hashed names are a production concern, not something the tests
+# are checking.
+STORAGES = {  # noqa: F405
+    **STORAGES,  # noqa: F405
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
