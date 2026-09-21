@@ -168,3 +168,43 @@ def test_a_file_that_is_not_an_image_is_refused(api, staff, tmp_path, settings):
     )
 
     assert response.status_code == 400
+
+
+# ---- what the browser actually emits ---------------------------------------
+# Captured by running document.execCommand in a real browser rather than
+# reasoning about it. Two of these were broken when first written: strike was
+# missing from the allow-list, and styleWithCSS produced spans whose style was
+# stripped, losing the formatting silently.
+
+@pytest.mark.parametrize(
+    "emitted,must_keep",
+    [
+        ("<p><b>hello</b> world</p>", "<b>"),
+        ("<p><i>hello</i> world</p>", "<i>"),
+        ("<p><u>hello</u> world</p>", "<u>"),
+        ("<p><strike>hello</strike> world</p>", "<strike>"),
+        ('<p style="text-align: center;">hello</p>', "text-align"),
+    ],
+)
+def test_the_toolbar_output_survives_a_round_trip(emitted, must_keep):
+    assert must_keep in clean_html(emitted)
+
+
+def test_invalid_list_nesting_from_execcommand_is_repaired():
+    """execCommand wraps a new list in the paragraph it replaced."""
+    cleaned = clean_html("<p><ul><li>a</li></ul></p>")
+
+    assert "<ul><li>a</li></ul>" in cleaned
+
+
+def test_a_css_styled_bold_is_recorded_as_lost():
+    """styleWithCSS must stay off in the editor, and this is why.
+
+    The span survives with an empty style, so the text is kept but the
+    formatting is not. If this ever starts passing differently, check what
+    RichTextEditor is setting before blaming the sanitiser.
+    """
+    cleaned = clean_html('<p><span style="font-weight: bold;">x</span></p>')
+
+    assert "font-weight" not in cleaned
+    assert "x" in cleaned

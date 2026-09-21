@@ -22,7 +22,10 @@ from bleach.css_sanitizer import CSSSanitizer
 # body breaks the document outline for screen readers and for search.
 ALLOWED_TAGS = {
     "p", "br", "hr",
-    "strong", "b", "em", "i", "u", "s", "del", "mark", "sub", "sup",
+    # `strike` is here because that is what execCommand("strikeThrough")
+    # actually emits in Chrome -- checked in a browser, not assumed. Without
+    # it the toolbar button appeared to do nothing after a save.
+    "strong", "b", "em", "i", "u", "s", "strike", "del", "mark", "sub", "sup",
     "h2", "h3", "h4",
     "ul", "ol", "li",
     "blockquote", "pre", "code",
