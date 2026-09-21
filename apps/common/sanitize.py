@@ -82,13 +82,22 @@ def _valid_ip(raw: str | None) -> str | None:
 def client_ip(request) -> str | None:
     """The caller's address, or None when it cannot be established.
 
-    X-Forwarded-For is attacker-controlled unless a proxy we trust is the one
-    setting it, so it is only read when TRUST_PROXY_HEADER says we sit behind
-    one. Anything that is not a parseable address returns None instead of
-    being written through to a GenericIPAddressField, which would otherwise
+    These headers are attacker-controlled unless a proxy we trust is the one
+    setting them, so they are only read when TRUST_PROXY_HEADER says we sit
+    behind one. Anything that is not a parseable address returns None instead
+    of being written through to a GenericIPAddressField, which would otherwise
     raise on save and turn a spoofed header into a 500.
+
+    CF-Connecting-IP is preferred over X-Forwarded-For. Cloudflare sets it to
+    exactly one address and overwrites any value the client sent, whereas
+    X-Forwarded-For is a list the client can prepend to. Behind Cloudflare,
+    REMOTE_ADDR is Cloudflare's own address for every visitor alike, so
+    falling back to it makes every visitor look like the same one.
     """
     if getattr(settings, "TRUST_PROXY_HEADER", False):
+        direct = _valid_ip(request.META.get("HTTP_CF_CONNECTING_IP"))
+        if direct:
+            return direct
         forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
         for candidate in forwarded.split(","):
             ip = _valid_ip(candidate)

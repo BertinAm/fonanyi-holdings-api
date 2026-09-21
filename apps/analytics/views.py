@@ -1,5 +1,7 @@
 from datetime import timedelta
+from urllib.parse import urlparse
 
+from django.conf import settings
 from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -15,6 +17,7 @@ from apps.gallery.models import GalleryImage
 from apps.siteinfo.models import Testimonial
 
 from .models import VisitEvent
+from .record import record
 from .serializers import VisitEventCreateSerializer, VisitEventSerializer
 
 
@@ -27,13 +30,15 @@ class TrackView(mixins.CreateModelMixin, viewsets.GenericViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user_agent = request.META.get("HTTP_USER_AGENT", "")[:300]
-        ip = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip() or request.META.get(
-            "REMOTE_ADDR", ""
-        )
-        serializer.save(
-            user_agent=user_agent,
-            visitor_hash=VisitEvent.make_visitor_hash(ip, user_agent, timezone.now().date()),
+        data = serializer.validated_data
+        # Routed through record() so the address logic lives in one place.
+        # This used to read X-Forwarded-For directly, which both trusted a
+        # spoofable header and ignored CF-Connecting-IP.
+        record(
+            request,
+            data["kind"],
+            path=data.get("path", ""),
+            label=data.get("label", ""),
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -43,10 +48,16 @@ class VisitEventViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = VisitEventSerializer
     permission_classes = [IsAdminUser]
     filterset_fields = ["kind"]
+    search_fields = ["path", "label", "referrer"]
 
 
 class DashboardSummaryView(APIView):
-    """Everything the admin dashboard header needs, in one request."""
+    """Everything the admin dashboard needs, in one request.
+
+    One endpoint rather than six: the dashboard opens on this, and six
+    round trips from Buea over a mobile connection is a visibly slower
+    screen than one.
+    """
 
     permission_classes = [IsAdminUser]
 
@@ -54,23 +65,31 @@ class DashboardSummaryView(APIView):
         now = timezone.now()
         week_ago = now - timedelta(days=7)
         prev_week = now - timedelta(days=14)
+        day_ago = now - timedelta(days=1)
 
         week_events = VisitEvent.objects.filter(created_at__gte=week_ago)
-        views_this_week = week_events.filter(kind="page").count()
-        views_prev_week = VisitEvent.objects.filter(
-            kind="page", created_at__gte=prev_week, created_at__lt=week_ago
-        ).count()
-        visitors_this_week = week_events.values("visitor_hash").distinct().count()
+        prev_events = VisitEvent.objects.filter(
+            created_at__gte=prev_week, created_at__lt=week_ago
+        )
+
+        views_this_week = week_events.filter(kind=VisitEvent.PAGE).count()
+        views_prev_week = prev_events.filter(kind=VisitEvent.PAGE).count()
+        visitors_this_week = (
+            week_events.filter(kind=VisitEvent.PAGE).values("visitor_hash").distinct().count()
+        )
+        visitors_prev_week = (
+            prev_events.filter(kind=VisitEvent.PAGE).values("visitor_hash").distinct().count()
+        )
 
         by_day = (
-            week_events.filter(kind="page")
+            week_events.filter(kind=VisitEvent.PAGE)
             .annotate(day=TruncDate("created_at"))
             .values("day")
             .annotate(count=Count("id"))
             .order_by("day")
         )
         top_pages = (
-            week_events.filter(kind="page")
+            week_events.filter(kind=VisitEvent.PAGE)
             .values("path")
             .annotate(count=Count("id"))
             .order_by("-count")[:8]
@@ -78,6 +97,7 @@ class DashboardSummaryView(APIView):
 
         return Response(
             {
+                # ---- content ----
                 "gallery_count": GalleryImage.objects.filter(is_published=True).count(),
                 "testimonial_count": Testimonial.objects.count(),
                 "post_count": Post.objects.count(),
@@ -86,12 +106,90 @@ class DashboardSummaryView(APIView):
                 "new_application_count": JobApplication.objects.filter(status="new").count(),
                 "total_application_count": JobApplication.objects.count(),
                 "total_message_count": ContactMessage.objects.count(),
+
+                # ---- traffic ----
                 "views_this_week": views_this_week,
                 "views_prev_week": views_prev_week,
                 "visitors_this_week": visitors_this_week,
+                "visitors_prev_week": visitors_prev_week,
                 "views_by_day": [
                     {"day": row["day"].isoformat(), "count": row["count"]} for row in by_day
                 ],
                 "top_pages": list(top_pages),
+                "top_referrers": self._top_referrers(week_events),
+
+                # ---- forms ----
+                "form_submissions_this_week": week_events.filter(kind=VisitEvent.FORM).count(),
+                "form_submissions_prev_week": prev_events.filter(kind=VisitEvent.FORM).count(),
+                "forms_by_type": list(
+                    week_events.filter(kind=VisitEvent.FORM)
+                    .values("label")
+                    .annotate(count=Count("id"))
+                    .order_by("-count")
+                ),
+                # Of the people who looked, how many got in touch. Guarded
+                # against a zero week, which is the normal state of a site
+                # that has just launched.
+                "conversion_rate": (
+                    round(
+                        week_events.filter(kind=VisitEvent.FORM).count()
+                        / visitors_this_week * 100,
+                        1,
+                    )
+                    if visitors_this_week
+                    else 0.0
+                ),
+
+                # ---- who is getting in ----
+                "logins_this_week": week_events.filter(kind=VisitEvent.LOGIN).count(),
+                "failed_logins_this_week": week_events.filter(
+                    kind=VisitEvent.LOGIN_FAILED
+                ).count(),
+                "failed_logins_today": VisitEvent.objects.filter(
+                    kind=VisitEvent.LOGIN_FAILED, created_at__gte=day_ago
+                ).count(),
+                "recent_logins": self._recent_logins(),
             }
         )
+
+    @staticmethod
+    def _top_referrers(week_events):
+        """Where visitors came from, with our own pages folded out.
+
+        A visitor moving between pages on the site refers themselves, which
+        would otherwise crowd out every real source.
+        """
+        rows = (
+            week_events.filter(kind=VisitEvent.PAGE)
+            .exclude(referrer="")
+            .values("referrer")
+            .annotate(count=Count("id"))
+            .order_by("-count")[:40]
+        )
+        own = urlparse(getattr(settings, "FRONTEND_URL", "")).netloc
+        folded = {}
+        for row in rows:
+            host = urlparse(row["referrer"]).netloc or row["referrer"]
+            if own and host == own:
+                continue
+            folded[host] = folded.get(host, 0) + row["count"]
+        ranked = sorted(folded.items(), key=lambda pair: -pair[1])[:6]
+        return [{"referrer": host, "count": count} for host, count in ranked]
+
+    @staticmethod
+    def _recent_logins():
+        rows = VisitEvent.objects.filter(
+            kind__in=[VisitEvent.LOGIN, VisitEvent.LOGIN_FAILED]
+        ).select_related("user")[:12]
+        return [
+            {
+                "id": row.id,
+                "username": (row.user.username if row.user else row.label),
+                "succeeded": row.kind == VisitEvent.LOGIN,
+                # A failed attempt against a name that does not exist is
+                # worth telling apart from one against a real account.
+                "known_account": row.user_id is not None,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ]

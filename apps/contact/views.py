@@ -6,10 +6,14 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
-logger = logging.getLogger(__name__)
+from apps.analytics.models import VisitEvent
+from apps.analytics.record import record
 
 from .models import ContactMessage
 from .serializers import ContactMessageAdminSerializer, ContactMessageCreateSerializer
+
+logger = logging.getLogger(__name__)
+
 
 
 class ContactMessageCreateView(mixins.CreateModelMixin, viewsets.GenericViewSet):
@@ -22,6 +26,9 @@ class ContactMessageCreateView(mixins.CreateModelMixin, viewsets.GenericViewSet)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         message = serializer.save()
+        # Counted as an event as well as a row, so the dashboard can show
+        # enquiries over time next to the traffic that produced them.
+        record(request, VisitEvent.FORM, path="/contact/", label="Contact enquiry")
         _notify_staff(message)
         return Response(
             {"detail": "Message received.", "id": message.id},

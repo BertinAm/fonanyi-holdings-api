@@ -6,10 +6,14 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
-logger = logging.getLogger(__name__)
+from apps.analytics.models import VisitEvent
+from apps.analytics.record import record
 
 from .models import JobApplication
 from .serializers import JobApplicationAdminSerializer, JobApplicationCreateSerializer
+
+logger = logging.getLogger(__name__)
+
 
 
 class JobApplicationCreateView(mixins.CreateModelMixin, viewsets.GenericViewSet):
@@ -22,6 +26,7 @@ class JobApplicationCreateView(mixins.CreateModelMixin, viewsets.GenericViewSet)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         application = serializer.save()
+        record(request, VisitEvent.FORM, path="/careers/", label="Job application")
         _notify_staff(application)
         return Response(
             {"detail": "Application received.", "id": application.id},
