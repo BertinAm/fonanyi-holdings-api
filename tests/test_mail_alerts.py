@@ -102,15 +102,43 @@ def test_no_recipient_means_no_mail_and_no_error(api, settings):
     assert mail.outbox == []
 
 
-def test_check_email_reports_a_local_password_as_a_problem(settings, capsys):
+def test_check_email_never_prints_the_password(settings, capsys):
     settings.EMAIL_HOST = "localhost"
-    settings.EMAIL_HOST_PASSWORD = "should-not-be-here"
+    settings.EMAIL_HOST_PASSWORD = "hunter2-but-longer"
     settings.EMAIL_HOST_USER = "noreply@example.com"
     settings.CONTACT_NOTIFY_EMAIL = "info@example.com"
 
     call_command("check_email")
 
     captured = capsys.readouterr()
-    assert "offers no AUTH" in captured.err
-    # The password itself must never be printed.
-    assert "should-not-be-here" not in captured.out + captured.err
+    assert "hunter2-but-longer" not in captured.out + captured.err
+    # Its length is enough to tell a missing value from one that failed to
+    # parse out of .env.
+    assert "18 characters" in captured.out
+
+
+def test_a_local_password_is_not_reported_as_a_problem(settings, capsys):
+    """Whether the relay offers AUTH is a fact about the server.
+
+    This was reported as a configuration problem on the assumption that a
+    local relay never authenticates. The production relay does, and the
+    warning sent someone to blank a password that was working.
+    """
+    settings.EMAIL_HOST = "localhost"
+    settings.EMAIL_HOST_PASSWORD = "a-working-password"
+    settings.EMAIL_HOST_USER = "noreply@example.com"
+    settings.CONTACT_NOTIFY_EMAIL = "info@example.com"
+
+    call_command("check_email")
+
+    assert "offers no AUTH" not in capsys.readouterr().err
+
+
+def test_a_missing_recipient_is_still_reported(settings, capsys):
+    settings.EMAIL_HOST = "localhost"
+    settings.EMAIL_HOST_USER = "noreply@example.com"
+    settings.CONTACT_NOTIFY_EMAIL = ""
+
+    call_command("check_email")
+
+    assert "CONTACT_NOTIFY_EMAIL is not set" in capsys.readouterr().err

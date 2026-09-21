@@ -102,15 +102,12 @@ class Command(BaseCommand):
                 continue
             problems.append(f"{name} is not set")
 
-        # Django calls login() whenever both are set, and smtplib raises
-        # SMTPNotSupportedError if the server offers no AUTH -- which the
-        # local relay usually does not. A password here breaks sending.
-        if local and settings.EMAIL_HOST_PASSWORD:
-            problems.append(
-                "EMAIL_HOST_PASSWORD is set with a local EMAIL_HOST. Django will "
-                "try to authenticate, and the local relay normally offers no AUTH. "
-                "Leave the password blank for localhost."
-            )
+        # A password with a local host used to be reported here as a problem,
+        # on the reasoning that Django calls login() whenever one is set and a
+        # local relay offers no AUTH. This host's relay does offer it, and the
+        # warning sent someone to blank a password that was working. Whether
+        # AUTH is available is a fact about the server, so it is established by
+        # connecting to it -- see _connect -- rather than assumed from here.
         if settings.EMAIL_USE_SSL and settings.EMAIL_USE_TLS:
             problems.append("EMAIL_USE_SSL and EMAIL_USE_TLS cannot both be on")
         if settings.EMAIL_PORT == 465 and not settings.EMAIL_USE_SSL:
@@ -230,7 +227,14 @@ class Command(BaseCommand):
         connection = get_connection(timeout=timeout)
         try:
             connection.open()
-        except (smtplib.SMTPAuthenticationError,) as error:
+        except smtplib.SMTPNotSupportedError:
+            self.stderr.write(
+                "  the server offers no AUTH, but a username and password are set, "
+                "so Django tried to authenticate anyway. Blank EMAIL_HOST_PASSWORD "
+                "for this host."
+            )
+            return
+        except smtplib.SMTPAuthenticationError as error:
             self.stderr.write(f"  rejected the username or password: {error}")
             return
         except (socket.timeout, TimeoutError):
