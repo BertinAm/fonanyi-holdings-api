@@ -1,9 +1,12 @@
+import re
+
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 
 from apps.common.images import compress
 from apps.common.models import TimeStampedModel
+from apps.common.richtext import clean_html, looks_like_html
 
 
 class Post(TimeStampedModel):
@@ -17,8 +20,8 @@ class Post(TimeStampedModel):
     slug = models.SlugField(max_length=220, unique=True, blank=True)
     excerpt = models.TextField(max_length=400, blank=True)
     body = models.TextField(
-        help_text="Plain text. Leave a blank line between paragraphs; "
-                  "markdown is not rendered.",
+        help_text="Rich text from the dashboard editor. Plain text is also "
+                  "accepted and is turned into paragraphs when rendered.",
     )
     cover_image = models.ImageField(upload_to="blog/%Y/%m/", blank=True, null=True)
     division = models.CharField(max_length=20, choices=DIVISION_CHOICES, default="company")
@@ -51,7 +54,15 @@ class Post(TimeStampedModel):
             self.slug = slug
         if self.is_published and self.published_at is None:
             self.published_at = timezone.now()
-        # Roughly 200 words a minute, so the card can show a read time.
-        words = len(self.body.split())
+        # Sanitised here rather than in the serializer, so that the admin,
+        # a management command and a fixture all go through it too. The
+        # public site renders this field as HTML, so anything unsafe reaching
+        # the column would reach every reader.
+        if looks_like_html(self.body):
+            self.body = clean_html(self.body)
+
+        # Roughly 200 words a minute, so the card can show a read time. Tags
+        # are stripped first: "<strong>" is not a word the reader reads.
+        words = len(re.sub(r"<[^>]+>", " ", self.body or "").split())
         self.read_minutes = max(1, round(words / 200))
         return super().save(*args, **kwargs)
