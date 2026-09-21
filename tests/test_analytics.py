@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.analytics.models import VisitEvent
@@ -154,3 +155,54 @@ def test_conversion_rate_survives_a_week_with_no_visitors(api, staff):
 
 def test_the_summary_stays_staff_only(api):
     assert api.get("/api/admin/summary/").status_code == 401
+
+
+# ---- the production/test divergence ----------------------------------------
+# The summary returned a 500 in production while all of these passed, because
+# the suite runs on SQLite and production runs on MySQL. TruncDate with
+# USE_TZ asks MySQL to CONVERT_TZ, which returns NULL unless the server's
+# timezone tables have been loaded -- shared hosting does not load them.
+# SQLite does the same conversion in Python and never fails, so the bug was
+# invisible here. The day grouping no longer goes through the database.
+
+def test_the_summary_survives_a_database_that_cannot_convert_timezones(api, staff):
+    """The exact failure: every grouped day comes back as None."""
+    from apps.analytics.views import DashboardSummaryView
+
+    api.post("/api/track/", {"kind": "page", "path": "/"}, format="json")
+
+    with patch.object(
+        DashboardSummaryView,
+        "_views_by_day",
+        staticmethod(lambda qs: [{"day": None, "count": 1}]),
+    ):
+        # Even fed the broken shape, building the response must not raise.
+        response = auth(api, staff).get("/api/admin/summary/")
+
+    assert response.status_code == 200
+
+
+def test_days_are_grouped_without_asking_the_database(api, staff):
+    """Grouping happens in Python, so no SQL date function is involved."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    for _ in range(3):
+        api.post("/api/track/", {"kind": "page", "path": "/"}, format="json")
+
+    with CaptureQueriesContext(connection) as queries:
+        body = auth(api, staff).get("/api/admin/summary/").json()
+
+    assert body["views_by_day"] == [
+        {"day": timezone.localtime(timezone.now()).date().isoformat(), "count": 3}
+    ]
+    sql = " ".join(q["sql"] for q in queries).upper()
+    assert "CONVERT_TZ" not in sql
+    assert "DJANGO_DATETIME_CAST_DATE" not in sql
+
+
+def test_a_day_with_no_views_is_simply_absent(api, staff):
+    """The frontend pads the week out; the API does not invent zero rows."""
+    body = auth(api, staff).get("/api/admin/summary/").json()
+
+    assert body["views_by_day"] == []

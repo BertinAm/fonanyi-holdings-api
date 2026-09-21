@@ -1,9 +1,9 @@
+from collections import Counter
 from datetime import timedelta
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.db.models import Count
-from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny, IsAdminUser
@@ -81,13 +81,7 @@ class DashboardSummaryView(APIView):
             prev_events.filter(kind=VisitEvent.PAGE).values("visitor_hash").distinct().count()
         )
 
-        by_day = (
-            week_events.filter(kind=VisitEvent.PAGE)
-            .annotate(day=TruncDate("created_at"))
-            .values("day")
-            .annotate(count=Count("id"))
-            .order_by("day")
-        )
+        by_day = self._views_by_day(week_events)
         top_pages = (
             week_events.filter(kind=VisitEvent.PAGE)
             .values("path")
@@ -112,9 +106,7 @@ class DashboardSummaryView(APIView):
                 "views_prev_week": views_prev_week,
                 "visitors_this_week": visitors_this_week,
                 "visitors_prev_week": visitors_prev_week,
-                "views_by_day": [
-                    {"day": row["day"].isoformat(), "count": row["count"]} for row in by_day
-                ],
+                "views_by_day": by_day,
                 "top_pages": list(top_pages),
                 "top_referrers": self._top_referrers(week_events),
 
@@ -151,6 +143,32 @@ class DashboardSummaryView(APIView):
                 "recent_logins": self._recent_logins(),
             }
         )
+
+    @staticmethod
+    def _views_by_day(week_events):
+        """Group page views by local date, in Python rather than in SQL.
+
+        TruncDate with USE_TZ on MySQL emits
+        CONVERT_TZ(created_at, 'UTC', 'Africa/Douala'), and that returns NULL
+        unless the server has had its timezone tables loaded with
+        mysql_tzinfo_to_sql -- which shared hosting does not do. Every row
+        then came back with day=None and building the response raised, so the
+        whole dashboard returned a 500 as soon as the first page view existed.
+
+        SQLite implements the same conversion in Python, so the test suite
+        never saw it. `manage.py check_analytics` reports whether this
+        server can do the conversion at all.
+
+        Reading one column for one week of traffic is cheap at this size. If
+        the site ever gets busy enough for that to matter, the fix is a
+        stored local date on the row, not CONVERT_TZ.
+        """
+        counts = Counter()
+        for stamp in week_events.filter(kind=VisitEvent.PAGE).values_list(
+            "created_at", flat=True
+        ):
+            counts[timezone.localtime(stamp).date()] += 1
+        return [{"day": day.isoformat(), "count": n} for day, n in sorted(counts.items())]
 
     @staticmethod
     def _top_referrers(week_events):
